@@ -28,4 +28,4 @@ jobs:
       - name: Run Instagram Monitor
         env:
           DISCORD_HOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: python instascrape.py
+        run: python main.py
