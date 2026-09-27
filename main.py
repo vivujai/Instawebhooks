@@ -32,7 +32,7 @@ def monitor_instagram():
         "instawebhooks",
         INSTAGRAM_USERNAME,
         DISCORD_WEBHOOK,
-        "--interval", "86400"  # Check once per day
+        "-i", "10800"  # Check once per day
         # "--session-file", "session.json",  # Uncomment if monitoring a private account
     ]
 
