@@ -3,10 +3,11 @@ import sys
 import os
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # Configuration
 INSTAGRAM_USERNAME = "irhs_official"
-DISCORD_WEBHOOK = load_dotenv("discord_hook")
-
+DISCORD_WEBHOOK = os.getenv("DISCORD_HOOK")
 def monitor_instagram():
     """
     Runs the instawebhooks CLI to monitor an Instagram account 
@@ -35,7 +36,7 @@ def monitor_instagram():
         # "--session-file", "session.json",  # Uncomment if monitoring a private account
     ]
 
-    print(f"Running command: {' '.join(cmd)}")
+    print(f"Running command: {cmd}")
     
     try:
         # Run the command
