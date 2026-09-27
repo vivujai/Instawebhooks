@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 # Configuration
 INSTAGRAM_USERNAME = "irhs_official"
-DISCORD_WEBHOOK = load_dotenv()
+DISCORD_WEBHOOK = load_dotenv("discord_hook")
 
 def monitor_instagram():
     """
