@@ -2,9 +2,8 @@ name: IRHS Monitor
 
 on:
   schedule:
-    # UTC times — 13:00 UTC = 9:00 AM EDT, 14:00 UTC = 9:00 AM EST
-    - cron: "0 13 * * *"
-  workflow_dispatch:   # lets you run it manually from the Actions tab
+    - cron: "0 13 * * *"   # 9:00 AM EDT (use 0 14 * * * for EST)
+  workflow_dispatch:
 
 jobs:
   check:
@@ -16,5 +15,5 @@ jobs:
           node-version: "20"
       - name: Run monitor
         env:
-          ZAP_HOOK: ${{ secrets.ZAP_HOOK }}
+          DISCORD_HOOK: ${{ secrets.DISCORD_HOOK }}
         run: node monitor.js
