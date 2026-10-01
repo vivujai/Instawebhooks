@@ -1,0 +1,19 @@
+name: IRHS Monitor
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 9:00 AM EDT (use 0 14 * * * for EST)
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run monitor
+        env:
+          DISCORD_HOOK: ${{ secrets.DISCORD_HOOK }}
+        run: node monitor.js
