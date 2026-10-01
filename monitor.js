@@ -1,6 +1,4 @@
 const PAGE_URL = "https://www.hdsb.ca/irs/news-events/";
-const DISCORD_HOOK =```javascript
-const PAGE_URL = "https://www.hdsb.ca/irs/news-events/";
 const DISCORD_HOOK = process.env.DISCORD_HOOK;
 
 async function extractText(html) {
@@ -31,7 +29,6 @@ async function extractText(html) {
     .join("\n");
 }
 
-// Discord hard-caps a message at 2000 characters.
 function chunkMessage(text, size = 1900) {
   const out = [];
   for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
@@ -45,11 +42,10 @@ async function sendToDiscord(content) {
     body: JSON.stringify({ content })
   });
 
-  // 429 = rate limited. Discord tells us how long to wait.
   if (r.status === 429) {
-    const { retry_after } = await r.json();
-    console.warn(`Rate limited, waiting ${retry_after}s`);
-    await new Promise(res => setTimeout(res, retry_after * 1000 + 500));
+    const data = await r.json();
+    console.warn("Rate limited, waiting " + data.retry_after + "s");
+    await new Promise(res => setTimeout(res, data.retry_after * 1000 + 500));
     return sendToDiscord(content);
   }
 
@@ -75,14 +71,14 @@ async function sendToDiscord(content) {
   }
 
   const text = extractText(await res.text());
-  console.log(`Extracted ${text.length} characters`);
+  console.log("Extracted " + text.length + " characters");
 
   const chunks = chunkMessage(text);
-  await sendToDiscord(`📢 **IRHS News & Events** — full page dump\n🔗 ${PAGE_URL}`);
+  await sendToDiscord("📢 IRHS News & Events\n🔗 " + PAGE_URL);
 
-  for (const [i, part] of chunks.entries()) {
-    console.log(`Sending chunk ${i + 1}/${chunks.length}`);
-    await sendToDiscord(part);
-    await new Promise(r => setTimeout(r, 1200)); // stay under webhook rate limits
+  for (let i = 0; i < chunks.length; i++) {
+    console.log("Sending chunk " + (i + 1) + "/" + chunks.length);
+    await sendToDiscord(chunks[i]);
+    await new Promise(r => setTimeout(r, 1200));
   }
 })();
