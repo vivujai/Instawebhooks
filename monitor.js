@@ -1,5 +1,7 @@
 const PAGE_URL = "https://www.hdsb.ca/irs/news-events/";
-const ZAP_HOOK = process.env.ZAP_HOOK;
+const DISCORD_HOOK =```javascript
+const PAGE_URL = "https://www.hdsb.ca/irs/news-events/";
+const DISCORD_HOOK = process.env.DISCORD_HOOK;
 
 async function extractText(html) {
   let s = html
@@ -29,13 +31,40 @@ async function extractText(html) {
     .join("\n");
 }
 
-function chunkMessage(text, size) {
+// Discord hard-caps a message at 2000 characters.
+function chunkMessage(text, size = 1900) {
   const out = [];
   for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
   return out;
 }
 
+async function sendToDiscord(content) {
+  const r = await fetch(DISCORD_HOOK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content })
+  });
+
+  // 429 = rate limited. Discord tells us how long to wait.
+  if (r.status === 429) {
+    const { retry_after } = await r.json();
+    console.warn(`Rate limited, waiting ${retry_after}s`);
+    await new Promise(res => setTimeout(res, retry_after * 1000 + 500));
+    return sendToDiscord(content);
+  }
+
+  if (!r.ok) {
+    console.error("Discord error", r.status, await r.text());
+  }
+  return r.status;
+}
+
 (async () => {
+  if (!DISCORD_HOOK) {
+    console.error("Missing DISCORD_HOOK secret");
+    process.exit(1);
+  }
+
   const res = await fetch(PAGE_URL, {
     headers: { "User-Agent": "Mozilla/5.0" }
   });
@@ -48,12 +77,12 @@ function chunkMessage(text, size) {
   const text = extractText(await res.text());
   console.log(`Extracted ${text.length} characters`);
 
-  for (const part of chunkMessage(text, 1800)) {
-    const r = await fetch(ZAP_HOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: part, page: PAGE_URL })
-    });
-    console.log("Hook status:", r.status);
+  const chunks = chunkMessage(text);
+  await sendToDiscord(`📢 **IRHS News & Events** — full page dump\n🔗 ${PAGE_URL}`);
+
+  for (const [i, part] of chunks.entries()) {
+    console.log(`Sending chunk ${i + 1}/${chunks.length}`);
+    await sendToDiscord(part);
+    await new Promise(r => setTimeout(r, 1200)); // stay under webhook rate limits
   }
 })();
