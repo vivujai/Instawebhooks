@@ -15,5 +15,5 @@ jobs:
           node-version: "20"
       - name: Run monitor
         env:
-          DISCORD_HOOK: ${{ secrets.DISCORD_HOOK }}
+          DISCORD_HOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: node monitor.js
