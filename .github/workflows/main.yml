@@ -1,32 +1,20 @@
-name: Instagram Monitor
+name: IRHS Monitor
 
 on:
   schedule:
-    # Runs at 00:00 UTC every day (change this time if you want)
-    - cron: '0 20 * * *'
-  # Also allows you to manually trigger it from the "Actions" tab
-  workflow_dispatch:
+    # UTC times — 13:00 UTC = 9:00 AM EDT, 14:00 UTC = 9:00 AM EST
+    - cron: "0 13 * * *"
+  workflow_dispatch:   # lets you run it manually from the Actions tab
 
 jobs:
-  monitor:
+  check:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install instawebhooks
-          pip install requests
-          pip install python-dotenv
-
-      - name: Run Instagram Monitor
+          node-version: "20"
+      - name: Run monitor
         env:
-          DISCORD_HOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: python main.py
+          ZAP_HOOK: ${{ secrets.ZAP_HOOK }}
+        run: node monitor.js
