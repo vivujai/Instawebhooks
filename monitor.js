@@ -1,32 +1,83 @@
 const PAGE_URL = "https://www.hdsb.ca/irs/news-events/";
 const DISCORD_HOOK = process.env.DISCORD_HOOK;
 
-async function extractText(html) {
-  let s = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(nav|header|footer|form|svg)[\s\S]*?<\/\1>/gi, " ");
+async function extractAnnouncements(html) {
+  // Get everything between the Daily Announcements heading and the next major section
+  // Look for a table structure or alternating title/announcement blocks
 
-  s = s.replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, "\n");
-  s = s.replace(/<br\s*\/?>/gi, "\n");
-  s = s.replace(/<[^>]+>/g, "");
+  // Strategy: find the section and extract title + text pairs
+  let section = html;
 
-  s = s
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n));
+  // Try to find the announcements table - IRHS lists them with alternating row colors
+  const tableMatch = html.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
 
-  return s
-    .split("\n")
-    .map(line => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n");
+  if (tableMatch) {
+    const tableHtml = tableMatch[1];
+    const rows = tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
+
+    if (rows && rows.length > 1) {
+      const announcements = [];
+
+      for (const row of rows) {
+        // Skip header row
+        if (row.toLowerCase().includes('title') && row.toLowerCase().includes('annou')) continue;
+
+        // Extract cells
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+
+        if (cells && cells.length >= 2) {
+          let title = cells[0].replace(/<[^>]+>/g, "").trim();
+          let text = cells[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+          // Clean up HTML entities
+          text = text
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;|&apos;/g, "'")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n));
+
+          title = title
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;|&apos;/g, "'")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n));
+
+          if (title && text) {
+            announcements.push({ title, text });
+          }
+        }
+      }
+
+      return announcements;
+    }
+  }
+
+  // Fallback: try to extract from a different structure
+  const results = [];
+  const titlePattern = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi;
+  let match;
+
+  while ((match = titlePattern.exec(html)) !== null) {
+    const title = match[1].replace(/<[^>]+>/g, "").trim();
+    if (title && title.length < 100) {
+      // Look for text following this heading
+      const afterMatch = html.slice(match.index + match[0].length);
+      const textMatch = afterMatch.match(/([\s\S]{0,500}?)(?:<h[1-6]|<\/div>|<\/section>|$)/i);
+      const text = textMatch ? textMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+
+      if (text && text.length > 10) {
+        results.push({ title, text });
+      }
+    }
+  }
+
+  return results;
 }
 
 function chunkMessage(text, size = 1900) {
@@ -70,15 +121,35 @@ async function sendToDiscord(content) {
     process.exit(1);
   }
 
-  const text = extractText(await res.text());
-  console.log("Extracted " + text.length + " characters");
+  const html = await res.text();
+  const announcements = extractAnnouncements(html);
 
-  const chunks = chunkMessage(text);
-  await sendToDiscord("📢 IRHS News & Events\n🔗 " + PAGE_URL);
+  console.log("Found " + announcements.length + " announcements");
 
-  for (let i = 0; i < chunks.length; i++) {
-    console.log("Sending chunk " + (i + 1) + "/" + chunks.length);
-    await sendToDiscord(chunks[i]);
-    await new Promise(r => setTimeout(r, 1200));
+  if (announcements.length === 0) {
+    console.log("No announcements found");
+    process.exit(0);
   }
+
+  // Build the message: each title + announcement, then link at the end
+  let message = "📢 **IRHS Daily Announcements**\n\n";
+
+  for (let i = 0; i < announcements.length; i++) {
+    const a = announcements[i];
+    message += "**" + a.title + "**\n" + a.text + "\n\n";
+
+    // Keep each chunk Discord-safe
+    if (message.length > 1800) {
+      await sendToDiscord(message.trim());
+      message = "";
+    }
+  }
+
+  // Append the link to the last chunk
+  if (message) {
+    message += "\n🔗 [Check full announcements](" + PAGE_URL + ")";
+    await sendToDiscord(message);
+  }
+
+  console.log("Done");
 })();
